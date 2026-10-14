@@ -1,25 +1,25 @@
 import streamlit as st
-import requests
 import time
+import random
+from google import genai
 
-# --- 画面設定 ---
 st.set_page_config(page_title="KAN-Pilot", page_icon="✈️", layout="centered")
 
-st.title("✈️ KAN-Pilot (Webアプリ版)")
+st.title("✈️ KAN-Pilot (Gemini AI 直結版)")
 st.caption("AI飲み会幹事ナビゲーション ＆ ネコレース")
 
-# --- API Keyの自動取得（Secretsから優先取得、無ければ入力欄を表示） ---
-api_key = st.secrets.get("DIFY_API_KEY", "")
-if not api_key:
-    api_key = st.sidebar.text_input("Dify API Key", type="password", help="設定されていない場合はここに入力してください")
+# サイドバーにGemini API Keyの入力欄を設定
+gemini_api_key = st.sidebar.text_input(
+    "Gemini API Key", 
+    type="password", 
+    help="Google AI Studioで取得したAPIキーを入力してください"
+)
 
-# --- メインフォーム ---
 with st.form("input_form"):
     st.subheader("📝 飲み会条件の入力")
-    
     col1, col2 = st.columns(2)
     with col1:
-        location = st.text_input("開催エリア", value="門前仲町")
+        location = st.text_input("開催エリア", value="東京")
     with col2:
         target_dates = st.text_input("候補日時", value="2026/09/01 19:00")
         
@@ -28,60 +28,63 @@ with st.form("input_form"):
         value="Aさん: 8000円\nBさん: 5000円\nCさん: 5000円\nDさん: 7000円",
         height=120
     )
-    
     allergies = st.text_input("アレルギー・NG食材", value="パクチー")
-    decision_mode = st.selectbox("お店の決定方法", ["あみだくじ", "起案者が決める", "AIにおまかせ"])
+    decision_mode = st.selectbox("お店の決定方法", ["ネコレースで決定", "起案者が決める", "多数決"])
     
     submit_btn = st.form_submit_button("🏁 KAN-Pilot 出撃（ネコレース開始！）")
 
-# --- 処理実行 ---
 if submit_btn:
-    if not api_key:
-        st.error("API Key が設定されていません。")
+    if not gemini_api_key:
+        st.error("左側のサイドバーに Gemini の API Key を入力してください！")
     else:
         # --- ネコレース演出 ---
         st.subheader("🐾 幹事決定ネコレース 開催中！")
         progress_bar = st.progress(0)
         status_text = st.empty()
         
-        cat_emojis = ["🐈‍⬛", "🐈", "🐱", "🐆"]
-        for percent_complete in range(100):
+        cats = ["ミケ🐈", "トラ🐈‍⬛", "タマ🐱", "レオ🐆"]
+        for percent in range(100):
             time.sleep(0.02)
-            progress_bar.progress(percent_complete + 1)
-            cat = cat_emojis[(percent_complete // 5) % len(cat_emojis)]
-            status_text.text(f"ネコたちが激走中... {cat} " + "💨" * (percent_complete // 10))
+            progress_bar.progress(percent + 1)
+            runner = cats[(percent // 5) % len(cats)]
+            status_text.text(f"ネコたちが激走中... {runner} " + "💨" * (percent // 10))
             
-        status_text.text("🏁 ネコたちがゴールインしました！レポートを生成中...")
+        winner_cat = random.choice(cats)
+        status_text.text(f"🏁 ゴール！ 幹事は {winner_cat} に決定！ AIがプランをフライト計算中...")
 
-        # --- Dify API呼び出し ---
-        url = "https://api.dify.ai/v1/workflows/run"
-        headers = {
-            "Authorization": f"Bearer {api_key}",
-            "Content-Type": "application/json"
-        }
-        payload = {
-            "inputs": {
-                "location": location,
-                "target_dates": target_dates,
-                "budget_list": budget_list,
-                "allergies": allergies,
-                "decision_mode": decision_mode
-            },
-            "response_mode": "blocking",
-            "user": "web_app_user"
-        }
-
+        # --- Gemini APIの呼び出し ---
         try:
-            with st.spinner("AIが最適プランをフライト計算中..."):
-                res = requests.post(url, headers=headers, json=payload)
-                data = res.json()
+            client = genai.Client(api_key=gemini_api_key)
+            
+            prompt = f"""
+あなたは優秀な飲み会幹事AI「KAN-Pilot」です。
+以下の条件に基づいて、参加者がワクワクするような最高の飲み会案内文とおすすめのお店案を作成してください。
+
+【条件】
+- 開催エリア: {location}
+- 候補日時: {target_dates}
+- 参加者と予算:
+{budget_list}
+- NG食材・アレルギー: {allergies}
+- 決定方法のレース結果: 幹事は「{winner_cat}」に決定しました。
+
+【出力形式】
+1. 幹事決定のお祝いと挨拶
+2. 開催概要まとめ
+3. 予算傾斜のアドバイス（誰がいくら払うべきかの目安提案）
+4. {location}周辺でおすすめの店舗ジャンルやプラン提案（3パターンほど）
+5. 参加者への案内文（LINE等にそのままコピペできるフォーマット）
+"""
+
+            with st.spinner("Geminiが最適な案内文を生成中..."):
+                response = client.models.generate_content(
+                    model='gemini-2.5-flash',
+                    contents=prompt,
+                )
                 
-                if res.status_code == 200:
-                    report = data.get("data", {}).get("outputs", {}).get("text", "")
-                    st.success("✈️ フライトプランが完成しました！")
-                    st.markdown("---")
-                    st.markdown(report)
-                else:
-                    st.error(f"APIエラー: {data.get('message', '不明なエラー')}")
+                st.success("✈️ フライトプラン（幹事案内文）が完成しました！")
+                st.markdown("---")
+                st.markdown(response.text)
+
         except Exception as e:
-            st.error(f"通信エラー: {e}")
+            st.error(f"API通信エラーが発生しました: {e}")
