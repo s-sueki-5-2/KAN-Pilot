@@ -8,7 +8,7 @@ st.set_page_config(page_title="KAN-Pilot", page_icon="✈️", layout="centered"
 st.title("✈️ KAN-Pilot (ネコ指名レース版)")
 st.caption("AI飲み会幹事ナビゲーション ＆ 幹事決定ネコレース")
 
-# Secretsに設定がある場合はそれを使い、無ければサイドバーから入力できるようにする
+# Secretsに設定がある場合は自動読み込み、無ければサイドバーから入力可能にする
 if "GEMINI_API_KEY" in st.secrets:
     gemini_api_key = st.secrets["GEMINI_API_KEY"]
 else:
@@ -17,7 +17,6 @@ else:
         type="password", 
         help="Google AI Studio等で取得したAPIキーを入力してください"
     )
-)
 
 with st.form("input_form"):
     st.subheader("📝 飲み会条件の入力")
@@ -58,7 +57,7 @@ with st.form("input_form"):
 
 if submit_btn:
     if not gemini_api_key:
-        st.error("左側のサイドバーに Gemini の API Key を入力してください！")
+        st.error("API Keyが設定されていません。StreamlitのSecretsに設定するか、サイドバーに入力してください！")
     else:
         # エントリー情報の整理
         participants = [
