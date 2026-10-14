@@ -8,11 +8,15 @@ st.set_page_config(page_title="KAN-Pilot", page_icon="✈️", layout="centered"
 st.title("✈️ KAN-Pilot (ネコ指名レース版)")
 st.caption("AI飲み会幹事ナビゲーション ＆ 幹事決定ネコレース")
 
-# サイドバーにGemini API Keyの入力欄を設定
-gemini_api_key = st.sidebar.text_input(
-    "Gemini API Key", 
-    type="password", 
-    help="Google AI Studio等で取得したAPIキーを入力してください"
+# Secretsに設定がある場合はそれを使い、無ければサイドバーから入力できるようにする
+if "GEMINI_API_KEY" in st.secrets:
+    gemini_api_key = st.secrets["GEMINI_API_KEY"]
+else:
+    gemini_api_key = st.sidebar.text_input(
+        "Gemini API Key", 
+        type="password", 
+        help="Google AI Studio等で取得したAPIキーを入力してください"
+    )
 )
 
 with st.form("input_form"):
