@@ -5,7 +5,7 @@ from google import genai
 
 st.set_page_config(page_title="KAN-Pilot", page_icon="✈️", layout="centered")
 
-st.title("✈️ KAN-Pilot (ネコ指名レース版)")
+st.title("✈️ KAN-Pilot (白熱ネコレース版)")
 st.caption("AI飲み会幹事ナビゲーション ＆ 幹事決定ネコレース")
 
 # Secretsに設定がある場合は自動読み込み、無ければサイドバーから入力可能にする
@@ -59,31 +59,57 @@ if submit_btn:
     if not gemini_api_key:
         st.error("API Keyが設定されていません。StreamlitのSecretsに設定するか、サイドバーに入力してください！")
     else:
-        # エントリー情報の整理
         participants = [
-            {"name": p1_name, "cat": p1_cat},
-            {"name": p2_name, "cat": p2_cat},
-            {"name": p3_name, "cat": p3_cat},
-            {"name": p4_name, "cat": p4_cat},
+            {"name": p1_name, "cat": p1_cat, "pos": 0},
+            {"name": p2_name, "cat": p2_cat, "pos": 0},
+            {"name": p3_name, "cat": p3_cat, "pos": 0},
+            {"name": p4_name, "cat": p4_cat, "pos": 0},
         ]
         
-        # --- ネコレース演出 ---
-        st.subheader("🐾 幹事決定ネコレース 開催中！")
-        progress_bar = st.progress(0)
-        status_text = st.empty()
+        # --- 本格ネコレース演出 ---
+        st.subheader("🐾 第1回 幹事決定ネコダービー 開催中！")
+        track_placeholders = [st.empty() for _ in range(4)]
+        commentary_placeholder = st.empty()
         
-        for percent in range(100):
-            time.sleep(0.02)
-            progress_bar.progress(percent + 1)
-            current_runner = participants[(percent // 5) % len(participants)]
-            status_text.text(f"ネコたちが激走中... {current_runner['name']}の{current_runner['cat']} " + "💨" * (percent // 10))
+        GOAL = 30  # マスの長さ
+        commentaries = [
+            "スタートしました！綺麗に揃った飛び出し！",
+            "おっと！？毛づくろいを始めて遅れるネコがいる！",
+            "コーナー旋回！激しい首位争いだ！",
+            "怒涛の猛追！一気に順位が入れ替わる！",
+            "ラストスパート！ゴールは目と鼻の先！",
+            "横一線！勝つのは誰だ！？"
+        ]
+        
+        winner = None
+        step_count = 0
+        
+        while not winner:
+            time.sleep(0.18)
+            step_count += 1
             
-        # ランダムで優勝者を決定
-        winner = random.choice(participants)
+            # 各ネコを進ませる（ランダムな歩数：0〜3進む）
+            for p in participants:
+                # 稀にハプニング発生（0進む）
+                move = random.choices([0, 1, 2, 3], weights=[15, 45, 30, 10])[0]
+                p["pos"] += move
+                if p["pos"] >= GOAL and not winner:
+                    winner = p
+            
+            # コース描画（各ネコの現在地をリアルタイム更新）
+            for i, p in enumerate(participants):
+                current_pos = min(p["pos"], GOAL)
+                lane = "─" * current_pos + p["cat"] + "─" * (GOAL - current_pos) + "🏁"
+                track_placeholders[i].markdown(f"**{p['name']}**: `{lane}`")
+            
+            # 実況文の更新
+            if step_count % 3 == 0 and not winner:
+                commentary_placeholder.info(f"🎙️ 実況: {random.choice(commentaries)}")
+
         winner_name = winner["name"]
         winner_cat = winner["cat"]
         
-        status_text.text(f"🏁 ゴール！ 1着は {winner_name} の【{winner_cat}】！ 幹事は {winner_name} に決定！")
+        commentary_placeholder.success(f"🏁 **ゴールイン！** 劇的な勝利を飾ったのは **{winner_name}** の【{winner_cat}】！ 幹事は **{winner_name}** に決定！")
         st.balloons()
         time.sleep(1)
 
@@ -107,7 +133,7 @@ if submit_btn:
 - NG食材・アレルギー: {allergies}
 
 【出力形式】
-1. 幹事決定のお祝いと挨拶（「{winner_name}さん、幹事おめでとうございます＆引き受けありがとうございます！」という人間に対する自然な挨拶にしてください）
+1. 幹事決定のお祝いと挨拶（「{winner_name}さん、幹事おめでとうございます＆引き受けありがとうございます！」という人間に対する自然な挨拶）
 2. 開催概要まとめ
 3. 予算傾斜のアドバイス（誰がいくら払うべきかの目安提案）
 4. {location}周辺でおすすめの店舗ジャンルやプラン提案（3パターンほど）
@@ -116,7 +142,7 @@ if submit_btn:
 
             with st.spinner("Geminiが最適な案内文を生成中..."):
                 response = client.models.generate_content(
-                    model='gemini-3.8-flash',
+                    model='gemini-1.5-flash',
                     contents=prompt,
                 )
                 
