@@ -88,14 +88,14 @@ if submit_btn:
             time.sleep(0.18)
             step_count += 1
             
-            # 各ネコを進ませる（ランダムな歩数：0〜3進む）
+            # 各ネコを進ませる（ランダムな歩数）
             for p in participants:
                 move = random.choices([0, 1, 2, 3], weights=[15, 45, 30, 10])[0]
                 p["pos"] += move
                 if p["pos"] >= GOAL and not winner:
                     winner = p
             
-            # コース描画（各ネコの現在地をリアルタイム更新）
+            # コース描画
             for i, p in enumerate(participants):
                 current_pos = min(p["pos"], GOAL)
                 lane = "─" * current_pos + p["cat"] + "─" * (GOAL - current_pos) + "🏁"
@@ -112,7 +112,7 @@ if submit_btn:
         st.balloons()
         time.sleep(1)
 
-        # --- Gemini API呼び出し（混雑自動回避・フォールバック機能付き） ---
+        # --- Gemini API呼び出し（gemini-3.8-flash 専用 & 混雑自動リトライ機能付き） ---
         try:
             client = genai.Client(api_key=gemini_api_key)
             
@@ -140,36 +140,28 @@ if submit_btn:
 """
 
             with st.spinner("Geminiが最適な案内文を計算中..."):
-                # 混雑時に試行するモデルの優先順位リスト
-                candidate_models = [
-                    'gemini-3.8-flash',
-                    'gemini-2.0-flash',
-                    'gemini-2.5-flash',
-                    'gemini-1.5-flash'
-                ]
-                
                 response = None
                 last_error = None
                 
-                # 順に試して最初に成功したモデルの結果を採用する
-                for model_name in candidate_models:
+                # 混雑(503)時に最大3回まで自動再試行（リトライ）する
+                for attempt in range(3):
                     try:
                         response = client.models.generate_content(
-                            model=model_name,
+                            model='gemini-3.8-flash',
                             contents=prompt,
                         )
                         if response:
                             break
                     except Exception as e:
                         last_error = e
-                        continue
+                        time.sleep(2)  # 2秒待って再試行
                 
                 if response:
                     st.success("✈️ フライトプラン（幹事案内文）が完成しました！")
                     st.markdown("---")
                     st.markdown(response.text)
                 else:
-                    st.error(f"AIの混雑により生成に失敗しました。少し時間をおいて再試行してください: {last_error}")
+                    st.error(f"API通信エラーが発生しました: {last_error}")
 
         except Exception as e:
             st.error(f"API通信エラーが発生しました: {e}")
