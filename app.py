@@ -78,7 +78,7 @@ if submit_btn:
 
             with st.spinner("Geminiが最適な案内文を生成中..."):
                 response = client.models.generate_content(
-                    model='gemini-2.5-flash',
+                    model='gemini-3.8-flash',
                     contents=prompt,
                 )
                 
